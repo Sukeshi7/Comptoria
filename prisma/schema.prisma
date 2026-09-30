@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Auth (schéma standard de l'adaptateur Prisma pour NextAuth)
+// Couvre à la fois OAuth (Account) et credentials (passwordHash sur User).
+// Garde Account/Session/VerificationToken même si tu pars sur credentials
+// au début : ça te laisse la porte ouverte à un provider OAuth plus tard
+// sans migration de schéma cassante.
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null si l'utilisateur est venu par OAuth
+
+  accounts Account[]
+  sessions Session[]
+  depenses Depense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────
+// Métier
+// ─────────────────────────────────────────────
+
+model Categorie {
+  id       String    @id @default(cuid())
+  nom      String    @unique
+  depenses Depense[]
+}
+
+model Depense {
+  id          String   @id @default(cuid())
+  montant     Decimal  @db.Decimal(10, 2)
+  date        DateTime
+  description String?
+  recuUrl     String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  categorieId String
+  categorie   Categorie @relation(fields: [categorieId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+}
